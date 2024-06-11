@@ -14,9 +14,20 @@ type Item struct {
 	Port       int
 	Network    string
 	Status     bool
-	TargetIP   string
+	TargetHost string
 	TargetPort int
 	Desc       string
+}
+
+func (item *Item) ToStrings() []string {
+	var d []string
+	var status string = "0"
+	if item.Status {
+		status = "1"
+	}
+	d = append(d, fmt.Sprintf("%d", item.Port), item.Network, status,
+		item.TargetHost, fmt.Sprintf("%d", item.TargetPort), item.Desc)
+	return d
 }
 
 func LoadCSV(filename string) ([]*Item, error) {
@@ -64,12 +75,12 @@ func LoadCSV(filename string) ([]*Item, error) {
 			e = errors.Join(e, fmt.Errorf("item:%s|err:status %s must is 1 or true or True or 0 or false or False", itemStr, record[2]))
 			continue
 		}
-		targetIP := net.ParseIP(record[3])
-		if targetIP == nil || targetIP.To4() == nil {
-			e = errors.Join(e, fmt.Errorf("item:%s|err:target ip %s is invalid or is not ipv4", itemStr, record[2]))
+		targetHost := net.ParseIP(record[3])
+		if targetHost == nil || targetHost.To4() == nil {
+			e = errors.Join(e, fmt.Errorf("item:%s|err:target host %s is invalid or is not ipv4", itemStr, record[2]))
 			continue
 		}
-		item.TargetIP = targetIP.String()
+		item.TargetHost = targetHost.String()
 
 		targetPort, err := strconv.Atoi(record[4])
 		if err != nil {
@@ -81,4 +92,19 @@ func LoadCSV(filename string) ([]*Item, error) {
 		d = append(d, item)
 	}
 	return d, err
+}
+
+func SaveCSV(filename string, nets []*NetConn) error {
+	f, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	writer := csv.NewWriter(f)
+	defer writer.Flush()
+	writer.Write([]string{"port", "type", "status", "target_ip", "target_port", "desc"})
+	for _, nc := range nets {
+		writer.Write(nc.ToStrings())
+	}
+	return nil
 }
