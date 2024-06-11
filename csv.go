@@ -102,7 +102,7 @@ func SaveCSV(filename string, nets []*NetConn) error {
 	defer f.Close()
 	writer := csv.NewWriter(f)
 	defer writer.Flush()
-	writer.Write([]string{"port", "type", "status", "target_ip", "target_port", "desc"})
+	writer.Write([]string{"port", "type", "status", "target_host", "target_port", "desc"})
 	for _, nc := range nets {
 		writer.Write(nc.ToStrings())
 	}
