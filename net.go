@@ -3,6 +3,7 @@ package portmapping
 import (
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"sync/atomic"
 	"time"
@@ -33,8 +34,10 @@ func ListenNet(nc *NetConn) {
 	for {
 		listener, err := net.Listen(nc.Network, fmt.Sprintf("0.0.0.0:%d", nc.Port))
 		if err != nil {
+			log.Printf("listen port:%d err:%s\n", nc.Port, err)
 			return
 		}
+		log.Printf("listen port:%d target_host:%s target_port:%d\n", nc.Port, nc.TargetHost, nc.TargetPort)
 		nc.listener = listener
 		nc.Status = true
 		for {
