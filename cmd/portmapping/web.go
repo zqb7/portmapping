@@ -31,7 +31,7 @@ func (s *Server) Index(c *gin.Context) {
 }
 
 func (s *Server) Add(c *gin.Context) {
-	item := portmapping.Item{Network: "tcp"}
+	item := portmapping.Item{Network: "tcp", TargetHost: "127.0.0.1"}
 	NETS = append(NETS, portmapping.NewNetConn(&item))
 	updateConfigChan <- struct{}{}
 	c.JSON(http.StatusOK, s.toClient(NETS))
