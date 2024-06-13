@@ -6,6 +6,7 @@
     <title>portmapping</title>
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/handsontable/dist/handsontable.full.min.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/handsontable/dist/handsontable.full.min.css" />
+    <script src="https://unpkg.com/axios@1.6.7/dist/axios.min.js"></script>
 </head>
 <style>
     body {
@@ -13,7 +14,6 @@
     }
     #main {
         margin: 15% 0 15% 30%;
-        height: 400px;
     }
 </style>
 <body>
@@ -46,6 +46,7 @@
         licenseKey: 'non-commercial-and-evaluation',
     });
     hot.addHook('afterChange', (row, e) => {
+        return
         console.log(row,e)
         let rowIndex = row[0][0]
         let before_value = row[0][2]
@@ -79,10 +80,21 @@
         }
     })
     hot.addHook("afterRemoveRow",(index, amount,physicalRows, source)=>{
-        console.log(index, amount,physicalRows, source)
-        var req = new XMLHttpRequest();
-        req.open("GET", `/action?index=${index}&event=del`,true)
-        req.send()
+        for (let i=0;i<physicalRows.length;i++){
+            axios.post(`/del/%{physicalRows[i]}`, {})
+        }
+    })
+    hot.addHook('beforeCreateRow',(index, amount, source)=>{
+        axios.post('/add', {})
+        .then(function (res) {
+            hot.updateData(res.data)
+        })
+        .catch(function (error) {
+            console.log(error);
+        });
+    })
+    hot.addHook('modifyData', (row, column,valueHolder)=>{
+        console.log(row, column,valueHolder)
     })
 </script>
 </html>

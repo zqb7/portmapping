@@ -2,54 +2,100 @@ package main
 
 import (
 	"fmt"
-	"html/template"
 	"log"
 	"net/http"
 
+	"github.com/gin-gonic/gin"
 	"github.com/zqb7/portmapping"
 )
 
-var updateConfigChan = make(chan struct{}, 16)
+var (
+	updateConfigChan = make(chan struct{}, 16)
+	server           = &Server{}
+)
 
-func handleIndex(w http.ResponseWriter, req *http.Request) {
-	tpl, _ := template.ParseFiles("index.tpl")
-	tpl.Execute(w, NETS)
+type Server struct {
 }
 
-func handleAction(w http.ResponseWriter, req *http.Request) {
-	index := req.URL.Query().Get("index")
-	event := req.URL.Query().Get("event")
-	var netConn *portmapping.NetConn
-	var netConnIndex int = -1
+func (s *Server) toClient(nets []*portmapping.NetConn) (d [][]interface{}) {
+	for _, v := range nets {
+		var v2 []interface{}
+		v2 = append(v2, v.Port, v.Network, v.Status, v.TargetHost, v.TargetPort, v.ClientNumber)
+		d = append(d, v2)
+	}
+	return
+}
+
+func (s *Server) Index(c *gin.Context) {
+	c.HTML(http.StatusOK, "index.tpl", NETS)
+}
+
+func (s *Server) Add(c *gin.Context) {
+	item := portmapping.Item{Network: "tcp"}
+	NETS = append(NETS, portmapping.NewNetConn(&item))
+	updateConfigChan <- struct{}{}
+	c.JSON(http.StatusOK, s.toClient(NETS))
+}
+
+func (s *Server) Start(c *gin.Context) {
 	for i, nc := range NETS {
-		if fmt.Sprintf("%d", i) == index {
+		if fmt.Sprintf("%d", i) == c.Param("index") {
+			go portmapping.ListenNet(nc)
+			updateConfigChan <- struct{}{}
+			c.JSON(http.StatusOK, gin.H{})
+			return
+		}
+	}
+}
+
+func (s *Server) Stop(c *gin.Context) {
+	for i, nc := range NETS {
+		if fmt.Sprintf("%d", i) == c.Param("index") {
+			nc.Stop()
+			updateConfigChan <- struct{}{}
+			c.JSON(http.StatusOK, gin.H{})
+			return
+		}
+	}
+}
+
+func (s *Server) Delete(c *gin.Context) {
+	for i, nc := range NETS {
+		if fmt.Sprintf("%d", i) == c.Param("index") {
+			nc.Stop()
+			NETS = append(NETS[:i], NETS[i+1:]...)
+			updateConfigChan <- struct{}{}
+			c.JSON(http.StatusOK, gin.H{})
+			return
+		}
+	}
+}
+
+func (s *Server) Update(c *gin.Context) {
+	var reqBody = make(map[string]string, 0)
+	err := c.ShouldBindBodyWithJSON(&reqBody)
+	if err != nil {
+		c.AbortWithError(http.StatusBadRequest, err)
+		return
+	}
+	var netConn *portmapping.NetConn
+	for i, nc := range NETS {
+		if fmt.Sprintf("%d", i) == c.Param("index") {
 			netConn = nc
-			netConnIndex = i
 			break
 		}
 	}
 	if netConn == nil {
-		http.Error(w, "invalid index", http.StatusBadRequest)
+		c.AbortWithStatus(http.StatusBadRequest)
 		return
 	}
-	switch event {
-	case "start":
-		go portmapping.ListenNet(netConn)
+	var isUpdate bool
+	if desc, ok := reqBody["desc"]; ok {
+		netConn.Desc = desc
+		isUpdate = true
+	}
+	if isUpdate {
 		updateConfigChan <- struct{}{}
-	case "stop":
-		netConn.Stop()
-		updateConfigChan <- struct{}{}
-	case "desc":
-		v := req.URL.Query().Get("v")
-		netConn.Desc = v
-		updateConfigChan <- struct{}{}
-	case "del":
-		if netConnIndex > -1 {
-			NETS = append(NETS[:netConnIndex], NETS[netConnIndex+1:]...)
-			updateConfigChan <- struct{}{}
-		}
-	default:
-		http.Error(w, "unkonwn event", http.StatusBadRequest)
 	}
 }
 
@@ -63,8 +109,14 @@ func updateConfig() {
 }
 
 func Web(port int) {
-	http.HandleFunc("/", handleIndex)
-	http.HandleFunc("/action", handleAction)
+	e := gin.Default()
+	e.LoadHTMLFiles("index.tpl")
+	e.GET("", server.Index)
+	e.POST("/start/:index", server.Start)
+	e.POST("/stop/:index", server.Stop)
+	e.POST("/del/:index", server.Delete)
+	e.POST("/update/:index", server.Update)
+	e.POST("/add", server.Add)
 	go updateConfig()
-	log.Fatalln(http.ListenAndServe(fmt.Sprintf("127.0.0.1:%d", port), nil))
+	log.Fatalln(e.Run(fmt.Sprintf("127.0.0.1:%d", port)))
 }
