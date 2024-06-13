@@ -31,13 +31,11 @@
         ],
         rowHeaders: true,
         colHeaders: ['本地端口', '网络类型', '是否启用', '远程主机', '远程端口','连接数','说明'],
-        width: '100%',
-        height: 'auto',
         autoWrapRow: true,
         autoWrapCol: true,
         columns: [
             {"data":0, "type":"numeric"},
-            {"data":1, "type":"text"},
+            {"data":1, "type":"dropdown", source:["tcp"]},
             {"data":2, "type":"checkbox"},
             {"data":3, "type":"text"},
             {"data":4, "type":"numeric"},
@@ -49,8 +47,11 @@
     });
     hot.addHook('afterChange', (row, e) => {
         console.log(row,e)
+        let rowIndex = row[0][0]
+        let before_value = row[0][2]
+        let after_value = row[0][3]
         var req = new XMLHttpRequest();
-        var url = `/action?index=${row[0][0]}`
+        var url = `/action?index=${rowIndex}`
         var event = ""
         var desc = ""
         if (row[0][1] == 2){
@@ -77,18 +78,10 @@
             req.send()
         }
     })
-    hot.addHook('afterOnCellMouseDown', (e, coords, TD)=>{
-        if (coords.col != 7 ){
-            return
-        }
+    hot.addHook("afterRemoveRow",(index, amount,physicalRows, source)=>{
+        console.log(index, amount,physicalRows, source)
         var req = new XMLHttpRequest();
-        var url = `/action?index=${coords.row}&event=del`
-        req.open("GET", url,true)
-        req.onreadystatechange=function(){
-            if (req.status==200){
-                hot.alter("remove_row",coords.row)
-            }
-        }
+        req.open("GET", `/action?index=${index}&event=del`,true)
         req.send()
     })
 </script>
